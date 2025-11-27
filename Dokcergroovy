@@ -1,0 +1,50 @@
+pipeline {
+
+    agent none
+
+    stages {
+
+        stage('Clone') {
+            agent { label 'n1' }
+            steps {
+                git branch: 'main', url: 'https://github.com/umakrishna-2002/sample.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                script {
+                    node('n1') {
+                        git branch: 'main', url: 'https://github.com/umakrishna-2002/sample.git'
+                        sh 'docker build -t myapp .'
+                    }
+
+                    node('n2') {
+                        git branch: 'main', url: 'https://github.com/umakrishna-2002/sample.git'
+                        sh 'docker build -t myapp .'
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                script {
+                    node('n1') {
+                        sh '''
+                        docker rm -f myapp || true
+                        docker run -d -p 80:80 --name myapp myapp
+                        '''
+                    }
+
+                    node('n2') {
+                        sh '''
+                        docker rm -f myapp || true
+                        docker run -d -p 80:80 --name myapp myapp
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}
