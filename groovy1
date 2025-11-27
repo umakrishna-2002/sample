@@ -1,0 +1,55 @@
+pipeline {
+    agent { label 'kma' }
+
+    environment {
+        IMAGE = "umakrishna/webapp:latest"
+    }
+
+    stages {
+
+        stage('Clone') {
+            steps {
+                git branch: 'main', url: 'https://github.com/umakrishna-2002/sample.git'
+            }
+        }
+
+        stage('Clean Old Images') {
+            steps {
+                sh """
+                docker rm -f webapp || true
+                docker rmi -f $IMAGE || true
+                """
+            }
+        }
+
+        stage('Build New Image') {
+            steps {
+                sh "docker build -t $IMAGE ."
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+                    sh """
+                    echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                    docker push $IMAGE
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh """
+                kubectl apply -f deployment.yaml
+                kubectl apply -f service.yaml
+                """
+            }
+        }
+    }
+}
